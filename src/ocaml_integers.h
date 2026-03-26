@@ -37,6 +37,13 @@ CAMLextern value integers_copy_uint64(uint64_t u);
 #define Int8_val(V) ((int8_t)(Int_val(V)))
 #define Int16_val(V) ((int16_t)(Int_val(V)))
 
+#ifdef ARCH_SIXTYFOUR
+#define Integers_val_small_int32(t)   (Val_int((intnat)(int32_t)(t)))
+#define Integers_small_int32_val(V)   ((int32_t)(Int_val(V)))
+#define Integers_val_small_uint32(t)  (Val_int((intnat)(uint32_t)(t)))
+#define Integers_small_uint32_val(V)  ((uint32_t)(Int_val(V)))
+#endif
+
 static int parse_digit(char c)
 {
   if (c >= '0' && c <= '9')

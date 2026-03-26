@@ -131,3 +131,103 @@ INT_SMALL_DECLS(16)
 INT_SMALL_DEFS(8)
 INT_SMALL_DEFS(16)
 
+#ifdef ARCH_SIXTYFOUR
+/* of_string : string -> t
+   Accumulates as uint32_t so that hex/octal/binary values spanning
+   the full 32-bit range (e.g. 0xDeadBeef) are accepted, matching
+   OCaml's Int32.of_string behaviour. Signed-range overflow is only
+   enforced for decimal input. */
+value integers_small_int32_of_string(value a)
+{
+  uint32_t u, max_prefix;
+  const char *pos = String_val(a);
+  int base = 10, d, sign = 1;
+
+  if (*pos == '-') {
+    sign = -1;
+    pos++;
+  } else if (*pos == '+') {
+    pos++;
+  }
+  if (*pos == '0') {
+    switch (pos[1]) {
+      case 'x': case 'X':
+        base = 16; pos += 2; break;
+      case 'o': case 'O':
+        base = 8; pos += 2; break;
+      case 'b': case 'B':
+        base = 2; pos += 2; break;
+      case 'u': case 'U':
+        pos += 2; break;
+    }
+  }
+
+  max_prefix = ((uint32_t) -1) / base;
+
+  d = parse_digit(*pos);
+  if (d < 0 || d >= base)
+    caml_failwith("Int32.of_string");
+  u = (uint32_t) d;
+  pos++;
+
+  for (;; pos++) {
+    if (*pos == '_') continue;
+    d = parse_digit(*pos);
+    if (d < 0 || d >= base) break;
+    if (u > max_prefix)
+      caml_failwith("Int32.of_string");
+    u = d + u * base;
+    if (u < (uint32_t) d)
+      caml_failwith("Int32.of_string");
+  }
+
+  if (pos != String_val(a) + caml_string_length(a))
+    caml_failwith("Int32.of_string");
+
+  /* For decimal, enforce the signed int32 range */
+  if (base == 10) {
+    if (sign > 0 && u > (uint32_t)INT32_MAX)
+      caml_failwith("Int32.of_string");
+    if (sign < 0 && u > (uint32_t)INT32_MAX + 1u)
+      caml_failwith("Int32.of_string");
+  }
+
+  /* Apply sign via unsigned arithmetic to avoid signed overflow UB */
+  if (sign < 0)
+    u = -u;
+
+  return Integers_val_small_int32((int32_t)u);
+}
+
+/* to_string : t -> string */
+value integers_small_int32_to_string(value a)
+{
+  char buf[BUF_SIZE(int32_t)];
+  if (sprintf(buf, "%" PRId32, Integers_small_int32_val(a)) < 0)
+    caml_failwith("Int32.to_string");
+  else
+    return caml_copy_string(buf);
+}
+
+/* to_hexstring : t -> string */
+value integers_small_int32_to_hexstring(value a)
+{
+  char buf[BUF_SIZE(int32_t)+1];
+  if (sprintf(buf, "%" PRIx32, (uint32_t)Integers_small_int32_val(a)) < 0)
+    caml_failwith("Int32.to_hexstring");
+  else
+    return caml_copy_string(buf);
+}
+
+/* max : unit -> t */
+value integers_small_int32_max(value unit)
+{
+  return Val_int((intnat)INT32_MAX);
+}
+
+/* min : unit -> t */
+value integers_small_int32_min(value unit)
+{
+  return Val_int((intnat)INT32_MIN);
+}
+#endif

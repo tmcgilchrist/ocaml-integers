@@ -65,7 +65,7 @@ module Int16 : S with type t = private int
 module Int : S with type t = int
 (** Signed integer type and operations. *)
 
-module Int32 : S with type t = int32
+module Int32 : S
 (** Signed 32-bit integer type and operations. *)
 
 module Int64 : S with type t = int64

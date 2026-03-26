@@ -326,6 +326,54 @@ value integers_ptrdiff_t_size (value _) { return Val_long(sizeof (ptrdiff_t)); }
 value integers_uint32_of_uint64 (value u) { return integers_copy_uint32(Uint_custom_val(64,u)); }
 value integers_uint64_of_uint32 (value u) { return integers_copy_uint64(Uint_custom_val(32,u)); }
 
+#ifdef ARCH_SIXTYFOUR
+/* of_string : string -> t (unboxed uint32) */
+value integers_small_uint32_of_string(value a)
+{
+  uint32_t u, max_prefix;
+  const char *pos = String_val(a);
+  int base = 10, d;
+
+  if (*pos == '+') pos++;
+  if (*pos == '0') {
+    switch (pos[1]) {
+      case 'x': case 'X':
+        base = 16; pos += 2; break;
+      case 'o': case 'O':
+        base = 8; pos += 2; break;
+      case 'b': case 'B':
+        base = 2; pos += 2; break;
+      case 'u': case 'U':
+        pos += 2; break;
+    }
+  }
+
+  max_prefix = ((uint32_t) -1) / base;
+
+  d = parse_digit(*pos);
+  if (d < 0 || d >= base) {
+    caml_failwith("UInt32.of_string");
+  }
+  u = (uint32_t) d;
+  pos++;
+
+  for (;; pos++) {
+    if (*pos == '_') continue;
+    d = parse_digit(*pos);
+    if (d < 0 || d >= base) break;
+    if (u > max_prefix) break;
+    u = d + u * base;
+    if (u < (uint32_t) d) break;
+  }
+
+  if (pos != String_val(a) + caml_string_length(a)){
+    caml_failwith("UInt32.of_string");
+  }
+
+  return Integers_val_small_uint32(u);
+}
+#endif
+
 value integers_unsigned_init(value unit)
 {
   caml_register_custom_operations(&caml_uint32_ops);

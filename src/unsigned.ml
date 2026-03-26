@@ -174,11 +174,13 @@ struct
 end
 
 
-module UInt32 : sig
+module type UInt32_S = sig
   include S
   val of_int32 : int32 -> t
   val to_int32 : t -> int32
-end =
+end
+
+module BoxedUInt32 : UInt32_S =
 struct
   module B =
   struct
@@ -226,12 +228,47 @@ struct
   module Infix = MakeInfix(B)
 end
 
+let make_small_uint32 () : (module UInt32_S) =
+  let module M = struct
+    module B = struct
+      type t = int
+      let max_int = 0xFFFF_FFFF
+      let add x y = (x + y) land max_int
+      let sub x y = (x - y) land max_int
+      let mul x y = (x * y) land max_int
+      let div = ( / )
+      let rem = ( mod )
+      let logand = ( land )
+      let logor = ( lor )
+      let logxor = ( lxor )
+      let shift_left x y = (x lsl y) land max_int
+      let shift_right = ( lsr )
+      let of_int x = x land max_int
+      external to_int : t -> int = "%identity"
+      let of_int64 x = of_int (Int64.to_int x)
+      let to_int64 x = Int64.of_int (to_int x)
+      external of_string : string -> t = "integers_small_uint32_of_string"
+      let to_string = string_of_int
+      let to_hexstring = format_int "%x"
+      let of_int32 i = (Int32.to_int i) land max_int
+      let to_int32 u = Int32.of_int u
+    end
+    include B
+    include Extras(B)
+    module Infix = MakeInfix(B)
+  end in
+  (module M : UInt32_S)
+
+module UInt32 : UInt32_S = (val
+  if Sys.int_size > 32 then make_small_uint32 ()
+  else (module BoxedUInt32 : UInt32_S))
+
 
 module UInt64 : sig
   include S
-  external of_uint32 : UInt32.t -> t = "integers_uint64_of_uint32"
-  external to_uint32 : t -> UInt32.t = "integers_uint32_of_uint64"
-end = 
+  val of_uint32 : UInt32.t -> t
+  val to_uint32 : t -> UInt32.t
+end =
 struct
   module B =
   struct
@@ -269,8 +306,8 @@ struct
        else
           Int64.sub (to_int64 (sub u64 half_max_plus_two)) half_max_minus_one_signed
 
-    external of_uint32 : UInt32.t -> t = "integers_uint64_of_uint32"
-    external to_uint32 : t -> UInt32.t = "integers_uint32_of_uint64"
+    let of_uint32 u = of_int64 (UInt32.to_int64 u)
+    let to_uint32 u = UInt32.of_int64 (to_int64 u)
     external _max_int : unit -> t = "integers_uint64_max"
     let max_int = _max_int ()
   end

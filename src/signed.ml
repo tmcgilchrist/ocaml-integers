@@ -194,7 +194,7 @@ struct
   let pp_hex fmt n = Format.fprintf fmt "%x" n
 end
 
-module Int32 =
+module BoxedInt32 =
 struct
   [@@@ocaml.warning "-32"]
   (* Int32.of_string_opt was introduced in OCaml 4.5b0.0 *)
@@ -211,6 +211,21 @@ struct
   let pp_hex fmt n = Format.fprintf fmt "%lx" n
   let to_hexstring n = Format.asprintf "%lx" n
 end
+
+let make_small_int32 () : (module S) =
+  let module M = MakeSmall(struct
+    let bits = 32
+    external of_string : string -> int = "integers_small_int32_of_string"
+    external to_string : int -> string = "integers_small_int32_to_string"
+    external to_hexstring : int -> string = "integers_small_int32_to_hexstring"
+    external max : unit -> int = "integers_small_int32_max"
+    external min : unit -> int = "integers_small_int32_min"
+  end) in
+  (module M : S)
+
+module Int32 : S = (val
+  if Sys.int_size > 32 then make_small_int32 ()
+  else (module BoxedInt32 : S))
 
 module Int64 =
 struct
