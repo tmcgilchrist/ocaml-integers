@@ -76,19 +76,6 @@ extern value integers_uint_size (value _);
 extern value integers_ulong_size (value _);
 extern value integers_ulonglong_size (value _);
 
-
-static int parse_digit(char c)
-{
-  if (c >= '0' && c <= '9')
-    return c - '0';
-  else if (c >= 'A' && c <= 'F')
-    return c - 'A' + 10;
-  else if (c >= 'a' && c <= 'f')
-    return c - 'a' + 10;
-  else
-    return -1;
-}
-
 #define Uint_custom_val(SIZE, V) Uint_custom_val_(SIZE, V)
 #define Uint_custom_val_(SIZE, V) \
   (*(uint ## SIZE ## _t *)(Data_custom_val(V)))
@@ -338,6 +325,54 @@ value integers_intptr_t_size (value _) { return Val_long(sizeof (intptr_t)); }
 value integers_ptrdiff_t_size (value _) { return Val_long(sizeof (ptrdiff_t)); }
 value integers_uint32_of_uint64 (value u) { return integers_copy_uint32(Uint_custom_val(64,u)); }
 value integers_uint64_of_uint32 (value u) { return integers_copy_uint64(Uint_custom_val(32,u)); }
+
+#ifdef ARCH_SIXTYFOUR
+/* of_string : string -> t (unboxed uint32) */
+value integers_small_uint32_of_string(value a)
+{
+  uint32_t u, max_prefix;
+  const char *pos = String_val(a);
+  int base = 10, d;
+
+  if (*pos == '+') pos++;
+  if (*pos == '0') {
+    switch (pos[1]) {
+      case 'x': case 'X':
+        base = 16; pos += 2; break;
+      case 'o': case 'O':
+        base = 8; pos += 2; break;
+      case 'b': case 'B':
+        base = 2; pos += 2; break;
+      case 'u': case 'U':
+        pos += 2; break;
+    }
+  }
+
+  max_prefix = ((uint32_t) -1) / base;
+
+  d = parse_digit(*pos);
+  if (d < 0 || d >= base) {
+    caml_failwith("UInt32.of_string");
+  }
+  u = (uint32_t) d;
+  pos++;
+
+  for (;; pos++) {
+    if (*pos == '_') continue;
+    d = parse_digit(*pos);
+    if (d < 0 || d >= base) break;
+    if (u > max_prefix) break;
+    u = d + u * base;
+    if (u < (uint32_t) d) break;
+  }
+
+  if (pos != String_val(a) + caml_string_length(a)){
+    caml_failwith("UInt32.of_string");
+  }
+
+  return Integers_val_small_uint32(u);
+}
+#endif
 
 value integers_unsigned_init(value unit)
 {
